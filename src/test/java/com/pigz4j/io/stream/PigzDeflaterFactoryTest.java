@@ -1,5 +1,7 @@
-package com.jmo.io.stream;
+package com.pigz4j.io.stream;
 
+import com.pigz4j.io.stream.PigzDeflater;
+import com.pigz4j.io.stream.PigzDeflaterFactory;
 import org.junit.Test;
 
 import java.util.concurrent.Callable;

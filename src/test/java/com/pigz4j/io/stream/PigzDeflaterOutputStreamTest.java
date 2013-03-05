@@ -1,5 +1,7 @@
-package com.jmo.io.stream;
+package com.pigz4j.io.stream;
 
+import com.pigz4j.io.stream.PigzDeflaterFactory;
+import com.pigz4j.io.stream.PigzDeflaterOutputStream;
 import org.junit.Test;
 
 import java.io.ByteArrayOutputStream;

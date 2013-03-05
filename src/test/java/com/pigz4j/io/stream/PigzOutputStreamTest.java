@@ -1,13 +1,9 @@
-package com.jmo.io.stream;
+package com.pigz4j.io.stream;
 
 import org.junit.Test;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.security.SecureRandom;
 import java.util.Arrays;
-import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import static org.junit.Assert.assertTrue;

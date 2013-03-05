@@ -1,4 +1,4 @@
-package com.jmo.io.stream;
+package com.pigz4j.io.stream;
 
 import java.io.IOException;
 import java.io.InputStream;
