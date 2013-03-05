@@ -17,7 +17,15 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class PigzOutputStream extends BufferedOutputStream {
 
+    /**
+     * Default size of buffered output stream.
+     */
     public static final int DEFAULT_BUFSZ = 1 << 17; // 128kB
+
+    /**
+     * Default size of buffered output stream.
+     */
+    public static final int DEFAULT_BLOCKSZ = 1 << 17; // 128kB
 
     private final PigzDeflaterOutputStream _deflaterDelegate;
 
@@ -26,17 +34,11 @@ public class PigzOutputStream extends BufferedOutputStream {
     }
 
     public PigzOutputStream(final OutputStream pOut, final int pBufferSize) throws IOException {
-        this(pOut, pBufferSize, new DefaultPigzDeflaterFactory(), getDefaultExecutorService());
+        this(pOut, pBufferSize, DEFAULT_BLOCKSZ);
     }
 
     public PigzOutputStream(final OutputStream pOut, final int pBufferSize, final int pBlockSize) throws IOException {
-        this(pOut, pBufferSize, pBlockSize, new DefaultPigzDeflaterFactory(), getDefaultExecutorService());
-    }
-
-    public PigzOutputStream(final OutputStream pOut, final int pBufferSize,
-                            final IPigzDeflaterFactory pDeflaterFactory,
-                            final ExecutorService pExecutorService) throws IOException {
-        this(new PigzDeflaterOutputStream(pOut, pDeflaterFactory, pExecutorService), pBufferSize);
+        this(pOut, pBufferSize, pBlockSize, PigzDeflaterFactory.DEFAULT, getDefaultExecutorService());
     }
 
     public PigzOutputStream(final OutputStream pOut, final int pBufferSize, final int pBlockSize,

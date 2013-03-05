@@ -8,20 +8,40 @@ import java.util.zip.Deflater;
 
 public class PigzDeflater extends Deflater {
 
+    private int _level;
+
     /**
      * @see Deflater#DEFAULT_COMPRESSION
      */
-    public PigzDeflater() {
+    protected PigzDeflater() {
         this(DEFAULT_COMPRESSION);
     }
 
     /**
      * Create with custom deflate level
-     * @param level 1 thru 9
-     * @see Deflater
+     * @param level 1 thru 9 or -1 for default
+     * @see Deflater#setLevel(int)
      */
-    public PigzDeflater(final int level) {
-        super(level, true);
+    protected PigzDeflater(final int level) {
+        this(level, true);
+    }
+
+    private PigzDeflater(final int level, final boolean nowrap) {
+        super(level, nowrap);
+        if ( !nowrap ) { throw new IllegalStateException("nowrap required for GZIP compatibility"); }
+        _level = level;
+    }
+
+    @Override
+    public void setLevel(final int level) {
+        if ( level != _level ) {
+            super.setLevel(level);
+            _level = level;
+        }
+    }
+
+    protected int getLevel() {
+        return _level;
     }
 
     /**

@@ -12,11 +12,12 @@ import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 
 /**
- * Performs heavy-lifting of threaded GZIP-compatible deflating per block and re-sequencing.
+ * Used as underlying heavy-lifting of threaded GZIP-compatible deflating per block and re-sequencing.
+ * Should not be used directly.
  *
  * Usage requires calling finish() before close().
  */
-public class PigzDeflaterOutputStream extends FilterOutputStream {
+class PigzDeflaterOutputStream extends FilterOutputStream {
 
     static final int DEFAULT_BLOCK_SIZE = 1 << 17; // 128k
 
@@ -213,7 +214,7 @@ public class PigzDeflaterOutputStream extends FilterOutputStream {
     /**
      * Submit gzip worker thread to executor service for processing the uncompressed input block.
      * @param pWorker
-     * @return
+     * @return Future of submitted worker
      */
     protected Future<?> submitWorker(final GzipWorker pWorker) {
         if ( _isShutdown ) {
@@ -321,7 +322,6 @@ public class PigzDeflaterOutputStream extends FilterOutputStream {
             }
         }
 
-        @Override
         public void run() {
             try {
 

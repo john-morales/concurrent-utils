@@ -3,14 +3,11 @@ package com.jmo.io.stream;
 import org.junit.Test;
 
 import java.io.ByteArrayOutputStream;
-import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -18,7 +15,7 @@ public class PigzDeflaterOutputStreamTest {
 
     @Test public void assertInvariants() throws Exception {
         try {
-            new PigzDeflaterOutputStream(null, new DefaultPigzDeflaterFactory(), Executors.newSingleThreadExecutor());
+            new PigzDeflaterOutputStream(null, PigzDeflaterFactory.DEFAULT, Executors.newSingleThreadExecutor());
             fail("expecting NPE from null output stream");
         } catch (NullPointerException expected) {
         }
@@ -30,13 +27,13 @@ public class PigzDeflaterOutputStreamTest {
         }
 
         try {
-            new PigzDeflaterOutputStream(new ByteArrayOutputStream(), new DefaultPigzDeflaterFactory(), null);
+            new PigzDeflaterOutputStream(new ByteArrayOutputStream(), PigzDeflaterFactory.DEFAULT, null);
             fail("expecting NPE from null executor service");
         } catch (NullPointerException expected) {
         }
 
         try {
-            new PigzDeflaterOutputStream(new ByteArrayOutputStream(), 0, new DefaultPigzDeflaterFactory(), Executors.newSingleThreadExecutor());
+            new PigzDeflaterOutputStream(new ByteArrayOutputStream(), 0, PigzDeflaterFactory.DEFAULT, Executors.newSingleThreadExecutor());
             fail("expecting IAE from block size less than 1");
         } catch (IllegalArgumentException expected) {
         }
@@ -45,7 +42,7 @@ public class PigzDeflaterOutputStreamTest {
     @Test public void exceptionsRethrown() throws Exception {
         try {
             final PigzDeflaterOutputStream out = new PigzDeflaterOutputStream(new FlakyOutputStream(),
-                    new DefaultPigzDeflaterFactory(),
+                    PigzDeflaterFactory.DEFAULT,
                     Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()));
 
             out.write(1);

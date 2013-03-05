@@ -1,6 +1,5 @@
 package com.jmo.io.stream;
 
-import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -69,7 +68,8 @@ public class PigzPerformanceTest extends PigzTest {
 
             final PigzOutputStream out = new PigzOutputStream(compressed,
                     PigzOutputStream.DEFAULT_BUFSZ,
-                    new DefaultPigzDeflaterFactory(),
+                    PigzOutputStream.DEFAULT_BLOCKSZ,
+                    PigzDeflaterFactory.DEFAULT,
                     Executors.newFixedThreadPool(pThreads));
 
             out.write(pSourceBytes);
