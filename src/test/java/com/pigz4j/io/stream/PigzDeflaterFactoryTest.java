@@ -56,7 +56,6 @@ public class PigzDeflaterFactoryTest {
         final PigzDeflater deflater = factory.getDeflater();
 
         final Future<PigzDeflater> future = Executors.newSingleThreadExecutor().submit(new Callable<PigzDeflater>() {
-            @Override
             public PigzDeflater call() throws Exception {
                 return factory.getDeflater();
             }

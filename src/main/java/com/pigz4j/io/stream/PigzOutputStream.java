@@ -29,6 +29,8 @@ public class PigzOutputStream extends BufferedOutputStream {
 
     private final PigzDeflaterOutputStream _deflaterDelegate;
 
+    private boolean _closed = false;
+
     public PigzOutputStream(final OutputStream pOut) throws IOException {
         this(pOut, DEFAULT_BUFSZ);
     }
@@ -89,8 +91,13 @@ public class PigzOutputStream extends BufferedOutputStream {
     }
 
     public void close(boolean pShutDownExecutor) throws IOException {
-        super.close();
-        _deflaterDelegate.close(pShutDownExecutor);
+        if ( !_closed ) {
+            finish();
+
+            super.close();
+            _deflaterDelegate.close(pShutDownExecutor);
+            _closed = true;
+        }
     }
 
     private static class ServiceHolder {

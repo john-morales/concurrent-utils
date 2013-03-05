@@ -33,7 +33,7 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
     protected GzipWorker _lastWorker;
     protected GzipWorker _previousWorker;
 
-    private volatile boolean _isShutdown;
+    private volatile boolean _isFinished;
 
 
     public PigzDeflaterOutputStream(final OutputStream pOut,
@@ -64,7 +64,7 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
 
         _deflaterFactory = pDeflaterFactory;
         _executorService = pExecutorService;
-        _isShutdown = false;
+        _isFinished = false;
         _blockSize = pBlockSize;
         _lastWorker = _previousWorker = null;
 
@@ -94,26 +94,27 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
      */
     public void finish(final long pTime, final TimeUnit pUnit) throws IOException {
         // TODO: make synchronized?
-        _isShutdown = true;
+        if ( !_isFinished) {
+            try {
+                // quick check now for errors before attempting to wait on workers.
+                assertNoError();
 
-        try {
-            // quick check now for errors before attempting to wait on workers.
-            assertNoError();
-
-            if ( _lastWorker != null ) {
-                if ( !_lastWorker.awaitDone(pTime, pUnit) ) {
-                    throw new IllegalStateException("executor service did not shutdown within timeout: " + pUnit.toMillis(pTime) + "msec");
+                if ( _lastWorker != null ) {
+                    if ( !_lastWorker.awaitDone(pTime, pUnit) ) {
+                        throw new IllegalStateException("executor service did not shutdown within timeout: " + pUnit.toMillis(pTime) + "msec");
+                    }
                 }
+            } catch (Exception e) {
+                _outWorker.cancel();
+                throw new IOException("error during stream finish", e);
+            } finally {
+                _finish(pTime, pUnit);
             }
-        } catch (Exception e) {
-            _outWorker.cancel();
-            throw new IOException("error during stream finish", e);
-        } finally {
-            _finish(pTime, pUnit);
-        }
 
-        // After everything shut down, assert no late errors from out writer.
-        assertNoError();
+            // After everything shut down, assert no late errors from out writer.
+            assertNoError();
+            _isFinished = true;
+        }
     }
 
     /**
@@ -164,8 +165,8 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
      * @throws IOException
      */
     public void close(final boolean pShutdown) throws IOException {
-        if ( !_isShutdown ) {
-            throw new IllegalStateException("closed without first calling finish()");
+        if ( !_isFinished) {
+            throw new IllegalStateException("closed called without having finished");
         }
 
         if ( pShutdown ) {
@@ -217,7 +218,7 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
      * @return Future of submitted worker
      */
     protected Future<?> submitWorker(final GzipWorker pWorker) {
-        if ( _isShutdown ) {
+        if (_isFinished) {
             throw new IllegalStateException("received submit after stream already shutdown");
         }
         if ( pWorker == null ) {

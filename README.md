@@ -27,8 +27,6 @@ Accepting all internal defaults:
 final PigzOutputStream out = new PigzOutputStream(new ByteArrayOutputStream());
 // write bytes to the stream however you like
 out.write(someBytesToCompress);
-out.finish();
-out.flush();
 out.close();
 ```
 
