@@ -3,7 +3,7 @@ package com.jmo.io.stream;
 /**
  * Returns re-usable thread local instance of Deflater with default compression.
  */
-public class DefaultPigzDeflaterFactory implements IPigzDeflaterFactory {
+public class PigzDeflaterFactory implements IPigzDeflaterFactory {
 
     /**
      * @return re-usable thread-local instance of PigzDeflater.
@@ -26,4 +26,7 @@ public class DefaultPigzDeflaterFactory implements IPigzDeflaterFactory {
             return deflater;
         }
     };
+
+    public static final PigzDeflaterFactory DEFAULT = new PigzDeflaterFactory();
+
 }

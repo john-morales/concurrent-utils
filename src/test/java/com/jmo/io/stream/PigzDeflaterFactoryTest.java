@@ -9,18 +9,18 @@ import java.util.concurrent.Future;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertSame;
 
-public class DefaultPigzDeflaterFactoryTest {
+public class PigzDeflaterFactoryTest {
 
     @Test public void getDeflater_SameThread() throws Exception {
-        final DefaultPigzDeflaterFactory factory = new DefaultPigzDeflaterFactory();
+        final PigzDeflaterFactory factory = new PigzDeflaterFactory();
         final PigzDeflater deflater = factory.getDeflater();
 
         assertSame(deflater, factory.getDeflater());
-        assertSame(deflater, new DefaultPigzDeflaterFactory().getDeflater());
+        assertSame(deflater, new PigzDeflaterFactory().getDeflater());
     }
 
     @Test public void getDeflater_DifferentThreads() throws Exception {
-        final DefaultPigzDeflaterFactory factory = new DefaultPigzDeflaterFactory();
+        final PigzDeflaterFactory factory = new PigzDeflaterFactory();
         final PigzDeflater deflater = factory.getDeflater();
 
         final Future<PigzDeflater> future = Executors.newSingleThreadExecutor().submit(new Callable<PigzDeflater>() {
@@ -31,7 +31,7 @@ public class DefaultPigzDeflaterFactoryTest {
         });
 
         assertNotSame(deflater, future.get());
-        assertSame(deflater, new DefaultPigzDeflaterFactory().getDeflater());
+        assertSame(deflater, new PigzDeflaterFactory().getDeflater());
     }
 
 }
