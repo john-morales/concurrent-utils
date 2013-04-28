@@ -19,7 +19,6 @@ public class PigzOutputStreamTest extends PigzTest {
         final byte[] sourceBytes = generateRandomBytes(14 * ONE_MB);
 
         final ByteArrayOutputStream compressed = new ByteArrayOutputStream();
-        final long start = System.currentTimeMillis();
 
         final PigzOutputStream out = new PigzOutputStream(compressed,
                 PigzOutputStream.DEFAULT_BUFSZ,
@@ -29,9 +28,6 @@ public class PigzOutputStreamTest extends PigzTest {
         out.finish();
         out.flush();
         out.close();
-
-        System.out.println("Msec: " + (System.currentTimeMillis() - start));
-        System.out.println("Compression: " + out.getCompressionRatio() + " = " + out.getTotalOut() + "/" + out.getTotalIn());
 
         final byte[] inflatedBytes = inflate(compressed).toByteArray();
         assertTrue(Arrays.equals(sourceBytes, inflatedBytes));
@@ -41,7 +37,6 @@ public class PigzOutputStreamTest extends PigzTest {
         final byte[] sourceBytes = generateSequenceInput(14 * ONE_MB);
 
         final ByteArrayOutputStream compressed = new ByteArrayOutputStream();
-        final long start = System.currentTimeMillis();
 
         final PigzOutputStream out = new PigzOutputStream(compressed,
                 PigzOutputStream.DEFAULT_BUFSZ,
@@ -52,9 +47,6 @@ public class PigzOutputStreamTest extends PigzTest {
         out.flush();
         out.close();
 
-        System.out.println("Msec: " + (System.currentTimeMillis() - start));
-        System.out.println("Compression: " + out.getCompressionRatio() + " = " + out.getTotalOut() + "/" + out.getTotalIn());
-
         final byte[] inflatedBytes = inflate(compressed).toByteArray();
         assertTrue(Arrays.equals(sourceBytes, inflatedBytes));
     }
@@ -63,14 +55,10 @@ public class PigzOutputStreamTest extends PigzTest {
         final byte[] sourceBytes = generateSequenceInput(14 * ONE_MB);
 
         final ByteArrayOutputStream compressed = new ByteArrayOutputStream();
-        final long start = System.currentTimeMillis();
 
         final PigzOutputStream out = new PigzOutputStream(compressed);
         out.write(sourceBytes);
         out.close();
-
-        System.out.println("Msec: " + (System.currentTimeMillis() - start));
-        System.out.println("Compression: " + out.getCompressionRatio() + " = " + out.getTotalOut() + "/" + out.getTotalIn());
 
         final byte[] inflatedBytes = inflate(compressed).toByteArray();
         assertTrue(Arrays.equals(sourceBytes, inflatedBytes));
@@ -80,7 +68,6 @@ public class PigzOutputStreamTest extends PigzTest {
         final byte[] sourceBytes = generateRandomBytes(14 * ONE_MB);
 
         final ByteArrayOutputStream compressed = new ByteArrayOutputStream();
-        final long start = System.currentTimeMillis();
 
         final GZIPOutputStream out = new GZIPOutputStream(compressed,PigzOutputStream.DEFAULT_BUFSZ);
 
@@ -88,8 +75,6 @@ public class PigzOutputStreamTest extends PigzTest {
         out.finish();
         out.flush();
         out.close();
-
-        System.out.println("Msec: " + (System.currentTimeMillis() - start));
 
         final byte[] inflatedBytes = inflate(compressed).toByteArray();
         assertTrue(Arrays.equals(sourceBytes, inflatedBytes));
@@ -99,7 +84,6 @@ public class PigzOutputStreamTest extends PigzTest {
         final byte[] sourceBytes = generateSequenceInput(14 * ONE_MB);
 
         final ByteArrayOutputStream compressed = new ByteArrayOutputStream();
-        final long start = System.currentTimeMillis();
 
         final GZIPOutputStream out = new GZIPOutputStream(compressed,PigzOutputStream.DEFAULT_BUFSZ);
 
@@ -107,8 +91,6 @@ public class PigzOutputStreamTest extends PigzTest {
         out.finish();
         out.flush();
         out.close();
-
-        System.out.println("Msec: " + (System.currentTimeMillis() - start));
 
         final byte[] inflatedBytes = inflate(compressed).toByteArray();
         assertTrue(Arrays.equals(sourceBytes, inflatedBytes));
