@@ -7,6 +7,8 @@ import java.util.Arrays;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.zip.CRC32;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
@@ -20,6 +22,7 @@ import java.util.zip.DeflaterOutputStream;
 class PigzDeflaterOutputStream extends FilterOutputStream {
 
     static final int DEFAULT_BLOCK_SIZE = 1 << 17; // 128k
+    static final Logger LOG = Logger.getLogger( PigzDeflaterOutputStream.class.getName() );
 
     private final ExecutorService _executorService;
     private final AtomicLong _sequencer;
@@ -81,9 +84,11 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
             _outWorker.finish();
             _outWorker.await(pTime, pUnit);
         } catch (InterruptedException e) {
+            LOG.log(Level.WARNING, "_finish: interrupted: " + e.getMessage());
             Thread.currentThread().interrupt();
         } catch (Exception e) {
             // don't care - called in finally, don't want to hide higher exception
+            LOG.log(Level.WARNING, "_finish: unexpected failure", e);
         }
     }
 
@@ -114,6 +119,7 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
             // After everything shut down, assert no late errors from out writer.
             assertNoError();
             _isFinished = true;
+            LOG.log(Level.FINE, "finish: stream finished successfully");
         }
     }
 
@@ -129,12 +135,14 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
         final byte[] payload = Arrays.copyOfRange(b, off, off + len);
         int offset = 0;
         int remaining = len;
+        if (LOG.isLoggable( Level.FINE )) { LOG.log(Level.FINE, "writing offset=" + off + " length=" + len); }
 
         while ( remaining > 0 ) {
             final int length = Math.min(_blockSize, remaining);
 
             final GzipWorker worker = newWorker(_sequencer.getAndIncrement(), payload, offset, length);
             submitWorker(worker);
+            if (LOG.isLoggable( Level.FINEST )) { LOG.log(Level.FINEST, "Worker submitted with offset=" + offset + " length=" + length); }
 
             remaining -= length;
             offset += length;
@@ -172,6 +180,7 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
         if ( pShutdown ) {
             _executorService.shutdownNow();
         }
+        LOG.log(Level.FINE, "close: stream closed successfully");
         super.close();
     }
 
@@ -263,7 +272,9 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
         super.finalize();
         _outWorker.cancel();
         if ( !isDefaultExecutor() ) {
+            LOG.log(Level.FINE, "finalize: Shutting down executor...");
             _executorService.shutdownNow();
+            LOG.log(Level.FINE, "finalize: Executor shutdown");
         }
     }
 
@@ -307,6 +318,7 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
         }
 
         void done() {
+            LOG.log(Level.FINEST, "gzip: done");
             _doneLatch.countDown();
         }
 
@@ -383,6 +395,7 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
         public void finish() throws IOException {
             super.finish();
             _underlyingStream.write(trailer());
+            LOG.log(Level.FINEST, "gzip: block finish");
         }
 
         byte[] trailer() throws IOException {
@@ -488,11 +501,13 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
 
         void finish() {
             interrupt();
+            LOG.log(Level.FINE, "out: finished");
         }
 
         void cancel() {
             _isCancelled = true;
             finish();
+            LOG.log(Level.FINE, "out: cancelled");
         }
     }
 

@@ -8,6 +8,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Extends buffered stream to re-use the buffering implementation, which in turn
@@ -26,6 +28,8 @@ public class PigzOutputStream extends BufferedOutputStream {
      * Default size of buffered output stream.
      */
     public static final int DEFAULT_BLOCKSZ = 1 << 17; // 128kB
+
+    static final Logger LOG = Logger.getLogger( PigzOutputStream.class.getName() );
 
     private final PigzDeflaterOutputStream _deflaterDelegate;
 
@@ -92,6 +96,7 @@ public class PigzOutputStream extends BufferedOutputStream {
 
     public void close(boolean pShutDownExecutor) throws IOException {
         if ( !_closed ) {
+            LOG.log(Level.FINE, "Closing output stream shutdownExecutor=" + pShutDownExecutor);
             finish();
 
             super.close();

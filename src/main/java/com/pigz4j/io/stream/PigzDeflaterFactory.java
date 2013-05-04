@@ -23,7 +23,6 @@ public class PigzDeflaterFactory implements IPigzDeflaterFactory {
      * with the compression level set as this factory's level.
      * @see Deflater
      */
-    @Override
     public PigzDeflater getDeflater() {
         final PigzDeflater deflater = __deflater.get();
         deflater.setLevel(_compressionLevel);

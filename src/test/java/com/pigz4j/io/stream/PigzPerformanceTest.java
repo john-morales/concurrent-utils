@@ -10,8 +10,8 @@ import java.util.zip.GZIPOutputStream;
 
 public class PigzPerformanceTest extends PigzTest {
 
-    private static final int PAYLOAD_SIZE = 14 * ONE_MB;
-    private static final int ROUNDS = 16;
+    private static final int PAYLOAD_SIZE = 64 * ONE_MB;
+    private static final int ROUNDS = 24;
     private static final int[] THREADS = new int[] {1, 2, 4, 8, 16, 24, 32};
 
     private static boolean _enabled;
@@ -53,7 +53,7 @@ public class PigzPerformanceTest extends PigzTest {
 
         for ( final int threads : THREADS ) {
             final byte[] sourceBytes = generateRandomBytes(PAYLOAD_SIZE);
-            runPerformanceTestPigz("type=random threads=" + threads + " impl=jre", sourceBytes, threads);
+            runPerformanceTestJre("type=random threads=" + threads + " impl=jre", sourceBytes, threads);
         }
     }
 
