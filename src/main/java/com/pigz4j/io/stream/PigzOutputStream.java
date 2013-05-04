@@ -107,13 +107,14 @@ public class PigzOutputStream extends BufferedOutputStream {
 
     private static class ServiceHolder {
         public static final ExecutorService SERVICE =
-                Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors(),
-                        new DaemonThreadFactory());
+                Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors(), DAEMON_FACTORY);
     }
 
     public static ExecutorService getDefaultExecutorService() {
         return ServiceHolder.SERVICE;
     }
+
+    public static final ThreadFactory DAEMON_FACTORY = new DaemonThreadFactory();
 
     private static final class DaemonThreadFactory implements ThreadFactory {
         static final AtomicInteger SERIAL = new AtomicInteger(0);

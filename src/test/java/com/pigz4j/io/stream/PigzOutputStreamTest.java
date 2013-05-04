@@ -25,8 +25,6 @@ public class PigzOutputStreamTest extends PigzTest {
                 PigzDeflaterOutputStream.DEFAULT_BLOCK_SIZE);
 
         out.write(sourceBytes);
-        out.finish();
-        out.flush();
         out.close();
 
         final byte[] inflatedBytes = inflate(compressed).toByteArray();
@@ -43,8 +41,6 @@ public class PigzOutputStreamTest extends PigzTest {
                 PigzDeflaterOutputStream.DEFAULT_BLOCK_SIZE);
 
         out.write(sourceBytes);
-        out.finish();
-        out.flush();
         out.close();
 
         final byte[] inflatedBytes = inflate(compressed).toByteArray();

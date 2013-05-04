@@ -338,8 +338,9 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
         public void run() {
             try {
 
-                // TODO: investigate prepopulating deflate dictionary ala pigz.
                 final GzipBlock blockDelegate = new GzipBlock(getDeflater(), _blockSize);
+                // TODO: investigate why decompression works with gunzip but not GZIPInputStream
+                // blockDelegate.setDictionary(_previous);
                 blockDelegate.write(_buffer, _offset, _len);
                 blockDelegate.finish();
                 onBlock(blockDelegate);
@@ -408,6 +409,12 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
             trailer.putInt(totalIn);
 
             return trailer.array();
+        }
+
+        public void setDictionary(final GzipWorker pPrevious) {
+            if ( pPrevious != null ) {
+                _underlyingDeflater.setDictionary(pPrevious._buffer, pPrevious._offset, pPrevious._len);
+            }
         }
 
         int blockIn() {
