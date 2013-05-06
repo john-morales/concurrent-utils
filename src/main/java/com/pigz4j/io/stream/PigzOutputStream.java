@@ -96,7 +96,7 @@ public class PigzOutputStream extends BufferedOutputStream {
 
     public void close(boolean pShutDownExecutor) throws IOException {
         if ( !_closed ) {
-            LOG.log(Level.FINE, "Closing output stream shutdownExecutor=" + pShutDownExecutor);
+            LOG.log(Level.FINE, "Closing output stream shutdownExecutor={0}", pShutDownExecutor);
             finish();
 
             super.close();

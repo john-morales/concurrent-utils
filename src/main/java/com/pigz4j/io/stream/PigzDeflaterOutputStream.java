@@ -32,11 +32,12 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
     private final int _blockSize;
     private final IPigzDeflaterFactory _deflaterFactory;
     private final OutWriter _outWorker;
+    private final CRC32 _crc;
 
-    protected GzipWorker _lastWorker;
-    protected GzipWorker _previousWorker;
-
-    private volatile boolean _isFinished;
+    private GzipWorker _lastWorker;
+    private GzipWorker _previousWorker;
+    private boolean _isFinished;
+    private boolean _isClosed;
 
 
     public PigzDeflaterOutputStream(final OutputStream pOut,
@@ -67,14 +68,16 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
 
         _deflaterFactory = pDeflaterFactory;
         _executorService = pExecutorService;
-        _isFinished = false;
         _blockSize = pBlockSize;
+        _isFinished = _isClosed = false;
         _lastWorker = _previousWorker = null;
 
         _sequencer = new AtomicLong(0L);
         _totalIn = new AtomicLong(0L);
         _totalOut = new AtomicLong(0L);
+        _crc = new CRC32();
 
+        pOut.write(GZIP_HEADER);
         _outWorker = new OutWriter(pOut);
         _outWorker.start();
     }
@@ -84,7 +87,7 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
             _outWorker.finish();
             _outWorker.await(pTime, pUnit);
         } catch (InterruptedException e) {
-            LOG.log(Level.WARNING, "_finish: interrupted: " + e.getMessage());
+            LOG.log(Level.WARNING, "_finish: interrupted: {0}", e.getMessage());
             Thread.currentThread().interrupt();
         } catch (Exception e) {
             // don't care - called in finally, don't want to hide higher exception
@@ -133,19 +136,19 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
         assertNoError();
 
         final byte[] payload = Arrays.copyOfRange(b, off, off + len);
-        int offset = 0;
+        LOG.log(Level.FINE, "write: writing {0} bytes total", len);
+
         int remaining = len;
-        if (LOG.isLoggable( Level.FINE )) { LOG.log(Level.FINE, "writing offset=" + off + " length=" + len); }
-
+        int blockOffset = 0;
         while ( remaining > 0 ) {
-            final int length = Math.min(_blockSize, remaining);
+            final int blockLen = Math.min(_blockSize, remaining);
 
-            final GzipWorker worker = newWorker(_sequencer.getAndIncrement(), payload, offset, length);
+            final GzipWorker worker = newWorker(_sequencer.getAndIncrement(), payload, blockOffset, blockLen);
             submitWorker(worker);
-            if (LOG.isLoggable( Level.FINEST )) { LOG.log(Level.FINEST, "Worker submitted with offset=" + offset + " length=" + length); }
+            LOG.log(Level.FINEST, "write: worker submitted {0} bytes", blockLen);
 
-            remaining -= length;
-            offset += length;
+            remaining -= blockLen;
+            blockOffset += blockLen;
         }
     }
 
@@ -161,6 +164,19 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
         write(buf, 0, 1);
     }
 
+
+    protected byte[] trailer() {
+        final int crcValue = (int) _crc.getValue();
+        final int isize = (int) getTotalIn();
+
+        final ByteBuffer trailer = ByteBuffer.allocate(8);
+        trailer.order(ByteOrder.LITTLE_ENDIAN);
+        trailer.putInt(crcValue);
+        trailer.putInt(isize);
+
+        return trailer.array();
+    }
+
     /**
      * Optionally shutdown executor service before closing underlying stream.
      *
@@ -169,19 +185,28 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
      * so will cause any future creations of PigzDeflaterOutputStream instances
      * to fail at construction time.
      *
-     * @param pShutdown true if this stream's executor service should be shutdown.
      * @throws IOException
      */
     public void close(final boolean pShutdown) throws IOException {
         if ( !_isFinished) {
             throw new IllegalStateException("closed called without having finished");
         }
-
         if ( pShutdown ) {
             _executorService.shutdownNow();
         }
-        LOG.log(Level.FINE, "close: stream closed successfully");
+
+        final byte[] buf = new byte[_blockSize];
+        final PigzDeflater def = getDeflater();
+        def.finish();
+        while ( !def.finished() ) {
+            int deflated = def.deflate(buf);
+            if ( deflated > 0 ) { out.write(buf, 0, deflated); }
+        }
+        out.write(trailer());
+
         super.close();
+        _isClosed = true;
+        LOG.log(Level.FINE, "close: stream closed successfully");
     }
 
     private void assertNoError() throws IOException {
@@ -254,13 +279,22 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
 
     /**
      * Optional hook to be notified on completion of a new gzipped block, but before
-     * it's been submitted to the out writer for writing to the underlying stream.
-     * *NOT* guaranteed to be called in input sequence order.
-     * @param pBlock single complete gzip-compatible block.
+     * it's been submitted for writing to the underlying stream.
+     * @param pBlock
      */
-    protected void onBlock(final GzipBlock pBlock) {
+    protected void onBlockUnsequenced(final GzipBlock pBlock) {
         _totalIn.addAndGet(pBlock.blockIn());
         _totalOut.addAndGet(pBlock.blockOut());
+    }
+
+    /**
+     * Optional hook to be notified in sequence order on completion of a new gzipped
+     * block, but before it's been submitted for writing ot underlying stream.
+     * @param pWorker
+     * @param pBlock
+     */
+    protected void onBlockSequenced(final GzipWorker pWorker, final GzipBlock pBlock) {
+        _crc.update(pWorker._buffer, pWorker._offset, pWorker._len);
     }
 
     protected boolean isDefaultExecutor() {
@@ -270,11 +304,15 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
     @Override
     protected void finalize() throws Throwable {
         super.finalize();
-        _outWorker.cancel();
-        if ( !isDefaultExecutor() ) {
-            LOG.log(Level.FINE, "finalize: Shutting down executor...");
-            _executorService.shutdownNow();
-            LOG.log(Level.FINE, "finalize: Executor shutdown");
+
+        if ( !_isClosed ) {
+            LOG.log(Level.WARNING, "finalize: GC cleaning up; stream was never closed");
+            _outWorker.cancel();
+            if ( !isDefaultExecutor() ) {
+                LOG.log(Level.FINE, "finalize: Shutting down executor...");
+                _executorService.shutdownNow();
+                LOG.log(Level.FINE, "finalize: Executor shutdown");
+            }
         }
     }
 
@@ -339,15 +377,15 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
             try {
 
                 final GzipBlock blockDelegate = new GzipBlock(getDeflater(), _blockSize);
-                // TODO: investigate why decompression works with gunzip but not GZIPInputStream
-                // blockDelegate.setDictionary(_previous);
+                blockDelegate.setDictionary(_previous);
                 blockDelegate.write(_buffer, _offset, _len);
                 blockDelegate.finish();
-                onBlock(blockDelegate);
+                onBlockUnsequenced(blockDelegate);
 
                 awaitPreviousDone();
                 // NOTE: effectively starts a critical section. Provides in-order writing.
 
+                onBlockSequenced(this, blockDelegate);
                 _outWorker.enqueueBlock(blockDelegate);
             } catch (IOException e) {
                 _thrown = e;
@@ -360,80 +398,63 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
                 done();
             }
         }
-
     }
 
     private static class GzipBlock extends DeflaterOutputStream {
 
-        private final CRC32 _blockCrc;
-        private final ByteArrayOutputStream _underlyingStream;
-        private final Deflater _underlyingDeflater;
+        private final ByteArrayOutputStream _compressedBuffer;
 
         public GzipBlock(final Deflater deflater, int pBlockSize) throws IOException {
             this(new ByteArrayOutputStream(pBlockSize), deflater, pBlockSize);
         }
 
-        private GzipBlock(final ByteArrayOutputStream out, final Deflater deflater, final int pBlockSize) throws IOException {
-            super(out, deflater, pBlockSize);
-            _underlyingStream = out;
-            _underlyingDeflater = deflater;
-            _blockCrc = new CRC32();
-
-            _underlyingStream.write(GZIP_HEADER);
+        private GzipBlock(final ByteArrayOutputStream pOut, final Deflater pDeflater, final int pBlockSize) throws IOException {
+            super(pOut, pDeflater, pBlockSize);
+            _compressedBuffer = pOut;
         }
 
         @Override
         public void write(final byte[] b, final int off, final int len) throws IOException {
-            super.write(b, off, len);
-            _blockCrc.update(b, off, len);
+            if (len == 0) { return; }
+
+            def.setInput(b, off, len);
+            int written = def.deflate(buf, 0, buf.length, Deflater.NO_FLUSH);
+            if (written > 0) { out.write(buf, 0, written); }
         }
 
         void writeTo(final OutputStream pOut) throws IOException {
-            _underlyingStream.writeTo(pOut);
+            _compressedBuffer.writeTo(pOut);
         }
 
         @Override
         public void finish() throws IOException {
-            super.finish();
-            _underlyingStream.write(trailer());
+            int written = def.deflate(buf, 0, buf.length, Deflater.SYNC_FLUSH);
+            if (written > 0) { out.write(buf, 0, written); }
             LOG.log(Level.FINEST, "gzip: block finish");
         }
 
-        byte[] trailer() throws IOException {
-            final int crcValue = (int) _blockCrc.getValue();
-            final int totalIn = _underlyingDeflater.getTotalIn();
-
-            final ByteBuffer trailer = ByteBuffer.allocate(8);
-            trailer.order(ByteOrder.LITTLE_ENDIAN);
-            trailer.putInt(crcValue);
-            trailer.putInt(totalIn);
-
-            return trailer.array();
-        }
-
-        public void setDictionary(final GzipWorker pPrevious) {
+        void setDictionary(final GzipWorker pPrevious) {
             if ( pPrevious != null ) {
-                _underlyingDeflater.setDictionary(pPrevious._buffer, pPrevious._offset, pPrevious._len);
+                // prep dictionary with last 1/4 of previous block
+                final int scaledLen = pPrevious._len / 4;
+                final int scaledOffset = pPrevious._offset - scaledLen + pPrevious._len;
+                def.setDictionary(pPrevious._buffer, scaledOffset, scaledLen);
+                LOG.log(Level.FINEST, "dictionary: using previous trailing {0} bytes", scaledLen);
             }
         }
 
         int blockIn() {
-            return _underlyingDeflater.getTotalIn();
+            return def.getTotalIn();
         }
 
         int blockOut() {
-            return _underlyingDeflater.getTotalOut();
+            return def.getTotalOut();
         }
-
-        /**
-         * GZIP Spec with no modification time, extra flags or OS info.
-         */
-        private final static byte[] GZIP_HEADER = {31, -117, 8, 0, 0, 0, 0, 0, 0, 0};
     }
 
     private static class OutWriter extends Thread {
         private static final AtomicInteger SERIAL = new AtomicInteger(0);
-        private static final String _namePrefix = "pigz4j-OutWorker-";
+        private static final String PREFIX = "pigz4j-OutWorker-";
 
         private final BlockingQueue<GzipBlock> _blockQueue;
         private final CountDownLatch _doneLatch;
@@ -443,7 +464,7 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
         private volatile boolean _isCancelled;
 
         OutWriter(final OutputStream pOut) {
-            super(_namePrefix + SERIAL.getAndIncrement());
+            super(PREFIX + SERIAL.getAndIncrement());
             setDaemon(true);
 
             _out = pOut;
@@ -517,5 +538,10 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
             LOG.log(Level.FINE, "out: cancelled");
         }
     }
+
+    /**
+     * GZIP Spec with no modification time, extra flags or OS info.
+     */
+    private final static byte[] GZIP_HEADER = {31, -117, 8, 0, 0, 0, 0, 0, 0, 0};
 
 }

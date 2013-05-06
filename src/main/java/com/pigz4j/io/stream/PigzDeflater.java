@@ -26,7 +26,7 @@ public class PigzDeflater extends Deflater {
         this(level, true);
     }
 
-    private PigzDeflater(final int level, final boolean nowrap) {
+    PigzDeflater(final int level, final boolean nowrap) {
         super(level, nowrap);
         if ( !nowrap ) { throw new IllegalStateException("nowrap required for GZIP compatibility"); }
         _level = level;
