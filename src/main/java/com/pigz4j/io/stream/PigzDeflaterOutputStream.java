@@ -7,11 +7,11 @@ import java.util.Arrays;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.CRC32;
 import java.util.zip.Deflater;
-import java.util.zip.DeflaterOutputStream;
 
 /**
  * Used as underlying heavy-lifting of threaded GZIP-compatible deflating per block and re-sequencing.
@@ -31,11 +31,11 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
 
     private final int _blockSize;
     private final IPigzDeflaterFactory _deflaterFactory;
-    private final OutWriter _outWorker;
+    private final GzipWriter _outWorker;
+    private final AtomicReference<IOException> _writeError;
     private final CRC32 _crc;
 
     private GzipWorker _lastWorker;
-    private GzipWorker _previousWorker;
     private boolean _isFinished;
     private boolean _isClosed;
 
@@ -70,7 +70,8 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
         _executorService = pExecutorService;
         _blockSize = pBlockSize;
         _isFinished = _isClosed = false;
-        _lastWorker = _previousWorker = null;
+        _lastWorker = null;
+        _writeError = new AtomicReference<IOException>(null);
 
         _sequencer = new AtomicLong(0L);
         _totalIn = new AtomicLong(0L);
@@ -78,21 +79,8 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
         _crc = new CRC32();
 
         pOut.write(GZIP_HEADER);
-        _outWorker = new OutWriter(pOut);
+        _outWorker = new GzipWriter(pOut);
         _outWorker.start();
-    }
-
-    private void _finish(final long pTime, final TimeUnit pUnit) throws IOException {
-        try {
-            _outWorker.finish();
-            _outWorker.await(pTime, pUnit);
-        } catch (InterruptedException e) {
-            LOG.log(Level.WARNING, "_finish: interrupted: {0}", e.getMessage());
-            Thread.currentThread().interrupt();
-        } catch (Exception e) {
-            // don't care - called in finally, don't want to hide higher exception
-            LOG.log(Level.WARNING, "_finish: unexpected failure", e);
-        }
     }
 
     /**
@@ -101,7 +89,6 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
      * take precedence.
      */
     public void finish(final long pTime, final TimeUnit pUnit) throws IOException {
-        // TODO: make synchronized?
         if ( !_isFinished) {
             try {
                 // quick check now for errors before attempting to wait on workers.
@@ -109,14 +96,13 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
 
                 if ( _lastWorker != null ) {
                     if ( !_lastWorker.awaitDone(pTime, pUnit) ) {
-                        throw new IllegalStateException("executor service did not shutdown within timeout: " + pUnit.toMillis(pTime) + "msec");
+                        throw new IOException("finish: last gzip worker thread did not complete within " + pUnit.toMillis(pTime) + "msec");
                     }
                 }
+                _outWorker.finish();
             } catch (Exception e) {
                 _outWorker.cancel();
-                throw new IOException("error during stream finish", e);
-            } finally {
-                _finish(pTime, pUnit);
+                throw new IOException("finish: error during stream finish", e);
             }
 
             // After everything shut down, assert no late errors from out writer.
@@ -132,7 +118,6 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
      */
     @Override
     public void write(final byte[] b, final int off, final int len) throws IOException {
-        // TODO: make synchronized?
         assertNoError();
 
         final byte[] payload = Arrays.copyOfRange(b, off, off + len);
@@ -177,6 +162,25 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
         return trailer.array();
     }
 
+    private void _close() throws IOException {
+        _outWorker.await();
+
+        // Writing closing bytes to stream - does not have to be same deflater
+        final byte[] buf = new byte[_blockSize];
+        final PigzDeflater def = getDeflater();
+        def.finish();
+        while ( !def.finished() ) {
+            int deflated = def.deflate(buf);
+            if ( deflated > 0 ) { out.write(buf, 0, deflated); }
+        }
+        out.write(trailer());
+    }
+
+    @Override
+    public void close() throws IOException {
+        this.close(!isDefaultExecutor());
+    }
+
     /**
      * Optionally shutdown executor service before closing underlying stream.
      *
@@ -189,31 +193,24 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
      */
     public void close(final boolean pShutdown) throws IOException {
         if ( !_isFinished) {
-            throw new IllegalStateException("closed called without having finished");
+            throw new IllegalStateException("bug: close called without having called finish");
         }
         if ( pShutdown ) {
             _executorService.shutdownNow();
         }
 
-        final byte[] buf = new byte[_blockSize];
-        final PigzDeflater def = getDeflater();
-        def.finish();
-        while ( !def.finished() ) {
-            int deflated = def.deflate(buf);
-            if ( deflated > 0 ) { out.write(buf, 0, deflated); }
-        }
-        out.write(trailer());
-
+        _close();
         super.close();
         _isClosed = true;
+
+        assertNoError();
         LOG.log(Level.FINE, "close: stream closed successfully");
     }
 
     private void assertNoError() throws IOException {
         _outWorker.throwOnError();
-        if ( _lastWorker != null ) {
-            _lastWorker.throwOnError();
-        }
+        final IOException ioe = _writeError.get();
+        if ( ioe != null ) { throw ioe; }
     }
 
     /**
@@ -259,7 +256,6 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
             throw new IllegalStateException("submitted null worker");
         }
 
-        _previousWorker = _lastWorker;
         _lastWorker = pWorker;
         return _executorService.submit(pWorker);
     }
@@ -319,7 +315,7 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
     class GzipWorker implements Runnable {
 
         private final long _sequence;
-        private final OutWriter _outWorker;
+        private final GzipWriter _outWorker;
         private final GzipWorker _previous;
         private final CountDownLatch _doneLatch;
         private final int _blockSize;
@@ -328,9 +324,7 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
         private final int _offset;
         private final int _len;
 
-        private IOException _thrown;
-
-        public GzipWorker(final long pSequence, final OutWriter pOutWorker, final GzipWorker pPrevious, final int pBlockSize,
+        public GzipWorker(final long pSequence, final GzipWriter pOutWorker, final GzipWorker pPrevious, final int pBlockSize,
                           final byte[] pBuf, final int pOff, final int pLen) throws IOException {
             _sequence = pSequence;
             _outWorker = pOutWorker;
@@ -356,7 +350,7 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
         }
 
         void done() {
-            LOG.log(Level.FINEST, "gzip: done");
+            LOG.log(Level.FINEST, "worker: sequence={0} done", _sequence);
             _doneLatch.countDown();
         }
 
@@ -366,15 +360,9 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
             }
         }
 
-        void throwOnError() throws IOException {
-            _outWorker.throwOnError();
-            if ( _thrown != null ) {
-                throw new IOException("GzipWorker failure", _thrown);
-            }
-        }
-
         public void run() {
             try {
+                LOG.log(Level.FINEST, "worker: sequence={0} start", _sequence);
 
                 final GzipBlock blockDelegate = new GzipBlock(getDeflater(), _blockSize);
                 blockDelegate.setDictionary(_previous);
@@ -388,11 +376,11 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
                 onBlockSequenced(this, blockDelegate);
                 _outWorker.enqueueBlock(blockDelegate);
             } catch (IOException e) {
-                _thrown = e;
-                throw new IllegalStateException(e);
+                LOG.log(Level.SEVERE, "worker: sequence=" + _sequence + " in illegal i/o state", e);
+                _writeError.compareAndSet(null, e);
             } catch (Exception e) {
-                _thrown = new IOException(e);
-                throw new IllegalStateException(e);
+                LOG.log(Level.SEVERE, "worker: sequence=" + _sequence + " in illegal state", e);
+                _writeError.compareAndSet(null, new IOException(e));
             } finally {
                 // NOTE: effectively ends critical section, enabling next block in sequence.
                 done();
@@ -400,36 +388,34 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
         }
     }
 
-    private static class GzipBlock extends DeflaterOutputStream {
+    private static class GzipBlock extends ByteArrayOutputStream {
+        public static final GzipBlock SENTINEL = new GzipBlock();
 
-        private final ByteArrayOutputStream _compressedBuffer;
+        private final Deflater _deflater;
+        private final byte[] _buffer;
 
-        public GzipBlock(final Deflater deflater, int pBlockSize) throws IOException {
-            this(new ByteArrayOutputStream(pBlockSize), deflater, pBlockSize);
+        private GzipBlock() {
+            this(null, 0);
         }
 
-        private GzipBlock(final ByteArrayOutputStream pOut, final Deflater pDeflater, final int pBlockSize) throws IOException {
-            super(pOut, pDeflater, pBlockSize);
-            _compressedBuffer = pOut;
+        public GzipBlock(final Deflater deflater, int pBlockSize) {
+            super(pBlockSize);
+            _deflater = deflater;
+            _buffer = new byte[pBlockSize];
         }
 
         @Override
-        public void write(final byte[] b, final int off, final int len) throws IOException {
+        public void write(final byte[] b, final int off, final int len) {
             if (len == 0) { return; }
 
-            def.setInput(b, off, len);
-            int written = def.deflate(buf, 0, buf.length, Deflater.NO_FLUSH);
-            if (written > 0) { out.write(buf, 0, written); }
+            _deflater.setInput(b, off, len);
+            int written = _deflater.deflate(_buffer, 0, _buffer.length, Deflater.NO_FLUSH);
+            if (written > 0) { super.write(_buffer, 0, written); }
         }
 
-        void writeTo(final OutputStream pOut) throws IOException {
-            _compressedBuffer.writeTo(pOut);
-        }
-
-        @Override
-        public void finish() throws IOException {
-            int written = def.deflate(buf, 0, buf.length, Deflater.SYNC_FLUSH);
-            if (written > 0) { out.write(buf, 0, written); }
+        public void finish() {
+            int written = _deflater.deflate(_buffer, 0, _buffer.length, Deflater.SYNC_FLUSH);
+            if (written > 0) { super.write(_buffer, 0, written); }
             LOG.log(Level.FINEST, "gzip: block finish");
         }
 
@@ -438,21 +424,21 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
                 // prep dictionary with last 1/4 of previous block
                 final int scaledLen = pPrevious._len / 4;
                 final int scaledOffset = pPrevious._offset - scaledLen + pPrevious._len;
-                def.setDictionary(pPrevious._buffer, scaledOffset, scaledLen);
-                LOG.log(Level.FINEST, "dictionary: using previous trailing {0} bytes", scaledLen);
+                _deflater.setDictionary(pPrevious._buffer, scaledOffset, scaledLen);
+                LOG.log(Level.FINEST, "gzip: using previous trailing {0} bytes", scaledLen);
             }
         }
 
         int blockIn() {
-            return def.getTotalIn();
+            return _deflater.getTotalIn();
         }
 
         int blockOut() {
-            return def.getTotalOut();
+            return _deflater.getTotalOut();
         }
     }
 
-    private static class OutWriter extends Thread {
+    private static class GzipWriter extends Thread {
         private static final AtomicInteger SERIAL = new AtomicInteger(0);
         private static final String PREFIX = "pigz4j-OutWorker-";
 
@@ -461,32 +447,18 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
         private final OutputStream _out;
 
         private IOException _thrown;
-        private volatile boolean _isCancelled;
 
-        OutWriter(final OutputStream pOut) {
+        GzipWriter(final OutputStream pOut) {
             super(PREFIX + SERIAL.getAndIncrement());
             setDaemon(true);
 
             _out = pOut;
             _blockQueue = new LinkedBlockingQueue<GzipBlock>();
             _doneLatch = new CountDownLatch(1);
-            _isCancelled = false;
-        }
-
-        private void write(final GzipBlock pBlock) {
-            try {
-                pBlock.writeTo(_out);
-            } catch (IOException e) {
-                _thrown = e;
-            } catch (Exception e) {
-                _thrown = new IOException(e);
-            }
         }
 
         void throwOnError() throws IOException {
-            if ( _thrown != null ) {
-                throw new IOException("OutWriter failure", _thrown);
-            }
+            if ( _thrown != null ) { throw _thrown; }
         }
 
         void enqueueBlock(final GzipBlock pBlock) throws InterruptedException, IOException {
@@ -494,47 +466,44 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
             _blockQueue.put(pBlock);
         }
 
-        void await() throws InterruptedException {
-            _doneLatch.await();
-        }
-
-        boolean await(final long pV, final TimeUnit pUnit) throws InterruptedException {
-            return _doneLatch.await(pV, pUnit);
-        }
-
-        private void drainQueue() {
-            GzipBlock block;
+        void await() throws IOException {
             try {
-                while ( (block = _blockQueue.take()) != null ) {
-                    write(block);
-                }
-            } catch (final InterruptedException pE) {
-                interrupt();
-                if ( _isCancelled ) { return; }
-            }
-
-            while ( (block = _blockQueue.poll()) != null ) {
-                write(block);
+                _doneLatch.await();
+            } catch (InterruptedException e) {
+                throw new IOException(e);
             }
         }
 
         @Override
         public void run() {
             try {
-                drainQueue();
+                GzipBlock block;
+                while ( (block = _blockQueue.take()) != GzipBlock.SENTINEL ) {
+                    block.writeTo(_out);
+                }
+            } catch (final InterruptedException e) {
+                LOG.log(Level.FINE, "out: worker interrupted (cancelled); queued={0}", _blockQueue.size());
+            } catch (IOException e) {
+                _thrown = e;
+                LOG.log(Level.SEVERE, "out: i/o error writing to underlying stream; queued=" + _blockQueue.size(), e);
+            } catch (Exception e) {
+                _thrown = new IOException(e);
+                LOG.log(Level.SEVERE, "out: error writing to underlying stream; queued=" + _blockQueue.size(), e);
             } finally {
                 _doneLatch.countDown();
             }
         }
 
-        void finish() {
-            interrupt();
-            LOG.log(Level.FINE, "out: finished");
+        void finish() throws IOException {
+            try {
+                enqueueBlock(GzipBlock.SENTINEL);
+            } catch (InterruptedException e) {
+                throw new IOException(e);
+            }
         }
 
         void cancel() {
-            _isCancelled = true;
-            finish();
+            interrupt();
             LOG.log(Level.FINE, "out: cancelled");
         }
     }

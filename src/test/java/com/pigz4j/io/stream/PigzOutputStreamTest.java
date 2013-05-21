@@ -10,13 +10,15 @@ import static org.junit.Assert.assertTrue;
 
 public class PigzOutputStreamTest extends PigzTest {
 
+    private static final int INPUT_SIZE = 2 * ONE_MB;
+
     @Test public void testRepeat() throws Exception {
         testCompression_Random();
         testCompression_Random();
     }
 
     @Test public void testCompression_Random() throws Exception {
-        final byte[] sourceBytes = generateRandomBytes(14 * ONE_MB);
+        final byte[] sourceBytes = generateRandomBytes(INPUT_SIZE);
 
         final ByteArrayOutputStream compressed = new ByteArrayOutputStream();
 
@@ -32,7 +34,7 @@ public class PigzOutputStreamTest extends PigzTest {
     }
 
     @Test public void testCompression_Sequence() throws Exception {
-        final byte[] sourceBytes = generateSequenceInput(14 * ONE_MB);
+        final byte[] sourceBytes = generateSequenceInput(INPUT_SIZE);
 
         final ByteArrayOutputStream compressed = new ByteArrayOutputStream();
 
@@ -48,7 +50,7 @@ public class PigzOutputStreamTest extends PigzTest {
     }
 
     @Test public void testFinishAlwaysCalled() throws Exception {
-        final byte[] sourceBytes = generateSequenceInput(14 * ONE_MB);
+        final byte[] sourceBytes = generateSequenceInput(INPUT_SIZE);
 
         final ByteArrayOutputStream compressed = new ByteArrayOutputStream();
 
@@ -61,7 +63,7 @@ public class PigzOutputStreamTest extends PigzTest {
     }
 
     @Test public void testCompression_RandomJre() throws Exception {
-        final byte[] sourceBytes = generateRandomBytes(14 * ONE_MB);
+        final byte[] sourceBytes = generateRandomBytes(INPUT_SIZE);
 
         final ByteArrayOutputStream compressed = new ByteArrayOutputStream();
 
@@ -77,7 +79,7 @@ public class PigzOutputStreamTest extends PigzTest {
     }
 
     @Test public void testCompression_SequenceJre() throws Exception {
-        final byte[] sourceBytes = generateSequenceInput(14 * ONE_MB);
+        final byte[] sourceBytes = generateSequenceInput(INPUT_SIZE);
 
         final ByteArrayOutputStream compressed = new ByteArrayOutputStream();
 
