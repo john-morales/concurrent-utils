@@ -117,20 +117,19 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
      * @throws java.io.IOException
      */
     @Override
-    public void write(final byte[] b, final int off, final int len) throws IOException {
+    public void write(final byte[] pBuf, final int pOff, final int pLen) throws IOException {
         assertNoError();
 
-        final byte[] payload = Arrays.copyOfRange(b, off, off + len);
-        LOG.log(Level.FINE, "write: writing {0} bytes total", len);
+        final byte[] block = Arrays.copyOfRange(pBuf, pOff, pOff + pLen);
+        LOG.log(Level.FINE, "write: writing {0} bytes total", pLen);
 
-        int remaining = len;
+        int remaining = pLen;
         int blockOffset = 0;
         while ( remaining > 0 ) {
             final int blockLen = Math.min(_blockSize, remaining);
 
-            final GzipWorker worker = newWorker(_sequencer.getAndIncrement(), payload, blockOffset, blockLen);
-            submitWorker(worker);
-            LOG.log(Level.FINEST, "write: worker submitted {0} bytes", blockLen);
+            submit(block, blockOffset, blockLen);
+            LOG.log(Level.FINEST, "write: worker submitted with block of {0} bytes", blockLen);
 
             remaining -= blockLen;
             blockOffset += blockLen;
@@ -244,33 +243,16 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
     }
 
     /**
-     * Submit gzip worker thread to executor service for processing the uncompressed input block.
-     * @param pWorker
+     * Submit sequenced slice of bytes executor service for processing the uncompressed input block.
      * @return Future of submitted worker
      */
-    protected Future<?> submitWorker(final GzipWorker pWorker) {
+    protected Future<?> submit(final byte[] pBuf, final int pOff, final int pLen) {
         if (_isFinished) {
             throw new IllegalStateException("received submit after stream already shutdown");
         }
-        if ( pWorker == null ) {
-            throw new IllegalStateException("submitted null worker");
-        }
 
-        _lastWorker = pWorker;
-        return _executorService.submit(pWorker);
-    }
-
-    /**
-     *
-     * @param pSequence
-     * @param b
-     * @param pOff
-     * @param pLen
-     * @return new worker thread to process this uncompressed input block.
-     * @throws IOException
-     */
-    protected GzipWorker newWorker(final long pSequence, final byte[] b, final int pOff, final int pLen) throws IOException {
-        return new GzipWorker(pSequence, _outWorker, _lastWorker, _blockSize, b, pOff, pLen);
+        _lastWorker = new GzipWorker(this, _sequencer.getAndIncrement(), _lastWorker, pBuf, pOff, pLen);
+        return _executorService.submit(_lastWorker);
     }
 
     /**
@@ -297,6 +279,10 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
         return _executorService == PigzOutputStream.getDefaultExecutorService();
     }
 
+    protected boolean setWriteError(final IOException expect, final IOException update) {
+        return _writeError.compareAndSet(expect, update);
+    }
+
     @Override
     protected void finalize() throws Throwable {
         super.finalize();
@@ -312,24 +298,22 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
         }
     }
 
-    class GzipWorker implements Runnable {
+    private static class GzipWorker implements Runnable {
 
+        private final PigzDeflaterOutputStream _stream;
         private final long _sequence;
-        private final GzipWriter _outWorker;
         private final GzipWorker _previous;
         private final CountDownLatch _doneLatch;
-        private final int _blockSize;
 
         private final byte[] _buffer;
         private final int _offset;
         private final int _len;
 
-        public GzipWorker(final long pSequence, final GzipWriter pOutWorker, final GzipWorker pPrevious, final int pBlockSize,
-                          final byte[] pBuf, final int pOff, final int pLen) throws IOException {
+        public GzipWorker(final PigzDeflaterOutputStream pStream, final long pSequence, final GzipWorker pPrevious,
+                          final byte[] pBuf, final int pOff, final int pLen) {
+            _stream = pStream;
             _sequence = pSequence;
-            _outWorker = pOutWorker;
             _previous = pPrevious;
-            _blockSize = pBlockSize;
             _doneLatch = new CountDownLatch(1);
 
             _buffer = pBuf;
@@ -364,23 +348,23 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
             try {
                 LOG.log(Level.FINEST, "worker: sequence={0} start", _sequence);
 
-                final GzipBlock blockDelegate = new GzipBlock(getDeflater(), _blockSize);
+                final GzipBlock blockDelegate = new GzipBlock(_stream.getDeflater(), _stream._blockSize);
                 blockDelegate.setDictionary(_previous);
                 blockDelegate.write(_buffer, _offset, _len);
                 blockDelegate.finish();
-                onBlockUnsequenced(blockDelegate);
+                _stream.onBlockUnsequenced(blockDelegate);
 
                 awaitPreviousDone();
                 // NOTE: effectively starts a critical section. Provides in-order writing.
 
-                onBlockSequenced(this, blockDelegate);
-                _outWorker.enqueueBlock(blockDelegate);
+                _stream.onBlockSequenced(this, blockDelegate);
+                _stream._outWorker.enqueueBlock(blockDelegate);
             } catch (IOException e) {
                 LOG.log(Level.SEVERE, "worker: sequence=" + _sequence + " in illegal i/o state", e);
-                _writeError.compareAndSet(null, e);
+                _stream.setWriteError(null, e);
             } catch (Exception e) {
                 LOG.log(Level.SEVERE, "worker: sequence=" + _sequence + " in illegal state", e);
-                _writeError.compareAndSet(null, new IOException(e));
+                _stream.setWriteError(null, new IOException(e));
             } finally {
                 // NOTE: effectively ends critical section, enabling next block in sequence.
                 done();

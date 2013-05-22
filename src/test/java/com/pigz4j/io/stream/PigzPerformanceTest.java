@@ -11,7 +11,11 @@ import java.util.zip.GZIPOutputStream;
 public class PigzPerformanceTest extends PigzTest {
 
     private static final int PAYLOAD_SIZE = 64 * ONE_MB;
-    private static final int ROUNDS = 24;
+
+    private static final int ROUNDS = 25;
+
+    private static final int SKIP_ROUNDS = 5; /* First SKIP_ROUNDS are JVM warmup and aren't counted */
+
     private static final int[] THREADS = new int[] {1, 2, 4, 8, 16, 24, 32};
 
     private static boolean _enabled;
@@ -78,14 +82,17 @@ public class PigzPerformanceTest extends PigzTest {
             out.close();
 
             final long finish = System.currentTimeMillis() - start;
-            totalDuration += finish;
-            totalIn += out.getTotalIn();
-            totalOut += out.getTotalOut();
+            if ( round >= SKIP_ROUNDS) {
+                totalDuration += finish;
+                totalIn += pSourceBytes.length;
+                totalOut += compressed.size();
+            }
         }
 
-        final double avgDuration = totalDuration / (double) ROUNDS;
-        final double avgIn = totalIn / (double) ROUNDS;
-        final double avgOut = totalOut / (double) ROUNDS;
+        final double countedRounds = (double)(ROUNDS - SKIP_ROUNDS);
+        final double avgDuration = totalDuration / countedRounds;
+        final double avgIn = totalIn / countedRounds;
+        final double avgOut = totalOut / countedRounds;
         final double avgCompressionRatio = totalOut / (double) totalIn;
         System.out.println(String.format("%s : avgDuration=%f avgIn=%f avgOut=%f avgCompressionRatio=%f",
                 pType, avgDuration, avgIn, avgOut, avgCompressionRatio));
@@ -108,14 +115,17 @@ public class PigzPerformanceTest extends PigzTest {
             out.close();
 
             final long finish = System.currentTimeMillis() - start;
-            totalDuration += finish;
-            totalIn += pSourceBytes.length;
-            totalOut += compressed.size();
+            if ( round >= SKIP_ROUNDS ) {
+                totalDuration += finish;
+                totalIn += pSourceBytes.length;
+                totalOut += compressed.size();
+            }
         }
 
-        final double avgDuration = totalDuration / (double) ROUNDS;
-        final double avgIn = totalIn / (double) ROUNDS;
-        final double avgOut = totalOut / (double) ROUNDS;
+        final double countedRounds = (double)(ROUNDS - SKIP_ROUNDS);
+        final double avgDuration = totalDuration / countedRounds;
+        final double avgIn = totalIn / countedRounds;
+        final double avgOut = totalOut / countedRounds;
         final double avgCompressionRatio = totalOut / (double) totalIn;
         System.out.println(String.format("%s : avgDuration=%f avgIn=%f avgOut=%f avgCompressionRatio=%f",
                 pType, avgDuration, avgIn, avgOut, avgCompressionRatio));
