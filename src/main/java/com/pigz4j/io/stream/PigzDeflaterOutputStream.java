@@ -31,7 +31,7 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
 
     private final int _blockSize;
     private final IPigzDeflaterFactory _deflaterFactory;
-    private final GzipWriter _outWorker;
+    private final GzipWriter _outWriter;
     private final AtomicReference<IOException> _writeError;
     private final CRC32 _crc;
 
@@ -79,8 +79,8 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
         _crc = new CRC32();
 
         pOut.write(GZIP_HEADER);
-        _outWorker = new GzipWriter(pOut);
-        _outWorker.start();
+        _outWriter = new GzipWriter(pOut);
+        _outWriter.start();
     }
 
     /**
@@ -95,13 +95,13 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
                 assertNoError();
 
                 if ( _lastWorker != null ) {
-                    if ( !_lastWorker.awaitDone(pTime, pUnit) ) {
+                    if ( !_lastWorker.await(pTime, pUnit) ) {
                         throw new IOException("finish: last gzip worker thread did not complete within " + pUnit.toMillis(pTime) + "msec");
                     }
                 }
-                _outWorker.finish();
+                _outWriter.finish();
             } catch (Exception e) {
-                _outWorker.cancel();
+                _outWriter.cancel();
                 throw new IOException("finish: error during stream finish", e);
             }
 
@@ -162,7 +162,7 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
     }
 
     private void _close() throws IOException {
-        _outWorker.await();
+        _outWriter.await();
 
         // Writing closing bytes to stream - does not have to be same deflater
         final byte[] buf = new byte[_blockSize];
@@ -207,7 +207,7 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
     }
 
     private void assertNoError() throws IOException {
-        _outWorker.throwOnError();
+        _outWriter.throwOnError();
         final IOException ioe = _writeError.get();
         if ( ioe != null ) { throw ioe; }
     }
@@ -271,8 +271,9 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
      * @param pWorker
      * @param pBlock
      */
-    protected void onBlockSequenced(final GzipWorker pWorker, final GzipBlock pBlock) {
+    protected void onBlockSequenced(final GzipWorker pWorker, final GzipBlock pBlock) throws IOException, InterruptedException {
         _crc.update(pWorker._buffer, pWorker._offset, pWorker._len);
+        _outWriter.enqueueBlock(pBlock);
     }
 
     protected boolean isDefaultExecutor() {
@@ -289,7 +290,7 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
 
         if ( !_isClosed ) {
             LOG.log(Level.WARNING, "finalize: GC cleaning up; stream was never closed");
-            _outWorker.cancel();
+            _outWriter.cancel();
             if ( !isDefaultExecutor() ) {
                 LOG.log(Level.FINE, "finalize: Shutting down executor...");
                 _executorService.shutdownNow();
@@ -321,11 +322,11 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
             _len = pLen;
         }
 
-        boolean awaitDone() throws IOException {
-            return awaitDone(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
+        boolean await() throws IOException {
+            return await(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
         }
 
-        boolean awaitDone(final long pV, final TimeUnit pUnit) throws IOException {
+        boolean await(final long pV, final TimeUnit pUnit) throws IOException {
             try {
                 return _doneLatch.await(pV, pUnit);
             } catch (InterruptedException e) {
@@ -338,9 +339,9 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
             _doneLatch.countDown();
         }
 
-        private void awaitPreviousDone() throws IOException {
+        private void awaitPrevious() throws IOException {
             if ( _previous != null ) {
-                _previous.awaitDone();
+                _previous.await();
             }
         }
 
@@ -354,11 +355,10 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
                 blockDelegate.finish();
                 _stream.onBlockUnsequenced(blockDelegate);
 
-                awaitPreviousDone();
+                awaitPrevious();
                 // NOTE: effectively starts a critical section. Provides in-order writing.
 
                 _stream.onBlockSequenced(this, blockDelegate);
-                _stream._outWorker.enqueueBlock(blockDelegate);
             } catch (IOException e) {
                 LOG.log(Level.SEVERE, "worker: sequence=" + _sequence + " in illegal i/o state", e);
                 _stream.setWriteError(null, e);
