@@ -25,43 +25,38 @@ public class PigzPerformanceTest extends PigzTest {
         if ( !_enabled ) { System.out.println("Skipping Performance Tests: -DincludePerfTests=true to enable"); }
     }
 
-    @Test public void testPigzOutputStreamHistogram_Sequence() throws Exception {
+    @Test public void testOutputStreamHistogram_Random() throws Exception {
         if ( !_enabled ) { return; }
 
+        System.out.println("# Threads\tpigz4j\tJRE\tRandom");
+        final Result jre = runPerformanceTestJre("Random", generateRandomBytes(PAYLOAD_SIZE));
+
+        Result pigz = null;
         for ( final int threads : THREADS ) {
-            final byte[] sourceBytes = generateSequenceInput(PAYLOAD_SIZE);
-            runPerformanceTestPigz("type=sequence threads=" + threads + " impl=pigz", sourceBytes, threads);
+            pigz = runPerformanceTestPigz("Random", generateRandomBytes(PAYLOAD_SIZE), threads);
+            System.out.println(threads + "\t" + pigz._avgDuration + "\t" + jre._avgDuration);
         }
+
+        System.out.println("Compression\t" + pigz._avgCompressionRatio + "\t" + jre._avgCompressionRatio);
     }
 
-    @Test public void testPigzOutputStreamHistogram_Random() throws Exception {
+    @Test public void testOutputStreamHistogram_Sequence() throws Exception {
         if ( !_enabled ) { return; }
 
+        System.out.println("# Threads\tpigz4j\tJRE\tSequence");
+        final byte[] sourceBytes = generateSequenceInput(PAYLOAD_SIZE);
+        final Result jre = runPerformanceTestJre("Random", sourceBytes);
+
+        Result pigz = null;
         for ( final int threads : THREADS ) {
-            final byte[] sourceBytes = generateRandomBytes(PAYLOAD_SIZE);
-            runPerformanceTestPigz("type=random threads=" + threads + " impl=pigz", sourceBytes, threads);
+            pigz = runPerformanceTestPigz("Random", sourceBytes, threads);
+            System.out.println(threads + "\t" + pigz._avgDuration + "\t" + jre._avgDuration);
         }
+
+        System.out.println("Compression\t" + pigz._avgCompressionRatio + "\t" + jre._avgCompressionRatio);
     }
 
-    @Test public void testJreOutputStreamHistogram_Sequence() throws Exception {
-        if ( !_enabled ) { return; }
-
-        for ( final int threads : THREADS ) {
-            final byte[] sourceBytes = generateSequenceInput(PAYLOAD_SIZE);
-            runPerformanceTestJre("type=sequence threads=" + threads + " impl=jre", sourceBytes, threads);
-        }
-    }
-
-    @Test public void testJreOutputStreamHistogram_Random() throws Exception {
-        if ( !_enabled ) { return; }
-
-        for ( final int threads : THREADS ) {
-            final byte[] sourceBytes = generateRandomBytes(PAYLOAD_SIZE);
-            runPerformanceTestJre("type=random threads=" + threads + " impl=jre", sourceBytes, threads);
-        }
-    }
-
-    private static void runPerformanceTestPigz(final String pType, final byte[] pSourceBytes, final int pThreads) throws IOException {
+    private static Result runPerformanceTestPigz(final String pType, final byte[] pSourceBytes, final int pThreads) throws IOException {
         long totalDuration = 0L;
         long totalIn = 0L;
         long totalOut = 0L;
@@ -94,11 +89,14 @@ public class PigzPerformanceTest extends PigzTest {
         final double avgIn = totalIn / countedRounds;
         final double avgOut = totalOut / countedRounds;
         final double avgCompressionRatio = totalOut / (double) totalIn;
-        System.out.println(String.format("%s : avgDuration=%f avgIn=%f avgOut=%f avgCompressionRatio=%f",
-                pType, avgDuration, avgIn, avgOut, avgCompressionRatio));
+        return new Result(pType, "pigz4j", (int)countedRounds, pThreads, avgDuration, avgIn, avgOut, avgCompressionRatio);
     }
 
-    private static void runPerformanceTestJre(final String pType, final byte[] pSourceBytes, final int pThreads) throws IOException {
+    private static Result runPerformanceTestJre(final String pType, final byte[] pSourceBytes) throws IOException {
+        return runPerformanceTestJre(pType, pSourceBytes, 1);
+    }
+
+    private static Result runPerformanceTestJre(final String pType, final byte[] pSourceBytes, final int pThreads) throws IOException {
         long totalDuration = 0L;
         long totalIn = 0L;
         long totalOut = 0L;
@@ -127,7 +125,30 @@ public class PigzPerformanceTest extends PigzTest {
         final double avgIn = totalIn / countedRounds;
         final double avgOut = totalOut / countedRounds;
         final double avgCompressionRatio = totalOut / (double) totalIn;
-        System.out.println(String.format("%s : avgDuration=%f avgIn=%f avgOut=%f avgCompressionRatio=%f",
-                pType, avgDuration, avgIn, avgOut, avgCompressionRatio));
+        return new Result(pType, "JRE", (int)countedRounds, pThreads, avgDuration, avgIn, avgOut, avgCompressionRatio);
+    }
+
+    private static class Result {
+        private final String _sequence;
+        private final String _type;
+        private final int _countedRounds;
+        private final int _threads;
+        private final double _avgDuration;
+        private final double _avgIn;
+        private final double _avgOut;
+        private final double _avgCompressionRatio;
+
+        Result(final String sequence, final String type,
+               final int countedRounds, final int threads,
+               final double avgDuration, final double avgIn, final double avgOut, final double avgCompressionRatio) {
+            _sequence = sequence;
+            _type = type;
+            _countedRounds = countedRounds;
+            _threads = threads;
+            _avgDuration = avgDuration;
+            _avgIn = avgIn;
+            _avgOut = avgOut;
+            _avgCompressionRatio = avgCompressionRatio;
+        }
     }
 }
