@@ -4,7 +4,7 @@
 
     <groupId>com.pigz4j.io.stream</groupId>
     <artifactId>pigz4j</artifactId>
-    <version>0.1-SNAPSHOT</version>
+    <version>0.2-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>pigz4j</name>

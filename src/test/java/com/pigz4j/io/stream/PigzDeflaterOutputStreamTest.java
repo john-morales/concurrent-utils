@@ -75,6 +75,7 @@ public class PigzDeflaterOutputStreamTest {
 
             out.write(1);
             flake.throwLatch.await(10, TimeUnit.SECONDS);
+            Thread.yield();
             out.write(2);
             fail("expecting IOException on write");
         } catch (IOException expected) {
@@ -93,6 +94,7 @@ public class PigzDeflaterOutputStreamTest {
 
             out.write(1);
             flake.throwLatch.await(10, TimeUnit.SECONDS);
+            Thread.yield();
             out.finish(1, TimeUnit.SECONDS);
 
             fail("expecting IOException on finish");
@@ -111,6 +113,7 @@ public class PigzDeflaterOutputStreamTest {
 
             out.write(1);
             sleepyFactory.sleepLatch.await();
+            Thread.yield();
             out.finish(1, TimeUnit.MILLISECONDS);
             fail("expecting IOException on deflating timeout");
         } catch (IOException expected) {

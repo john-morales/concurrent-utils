@@ -99,7 +99,6 @@ public class PigzOutputStream extends BufferedOutputStream {
             LOG.log(Level.FINE, "Closing output stream shutdownExecutor={0}", pShutDownExecutor);
             finish();
 
-            super.close();
             _deflaterDelegate.close(pShutDownExecutor);
             _closed = true;
         }
