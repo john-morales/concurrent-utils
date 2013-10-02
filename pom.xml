@@ -3,7 +3,7 @@
 
     <groupId>com.pigz4j.io.stream</groupId>
     <artifactId>pigz4j</artifactId>
-    <version>0.2</version>
+    <version>0.3-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>pigz4j</name>
@@ -19,7 +19,7 @@
         <connection>scm:git:git@github.com:john-morales/pigz4j.git</connection>
         <url>scm:git:git@github.com:john-morales/pigz4j.git</url>
         <developerConnection>scm:git:git@github.com:john-morales/pigz4j.git</developerConnection>
-      <tag>v0.2</tag>
+      <tag>HEAD</tag>
   </scm>
 
     <properties>
