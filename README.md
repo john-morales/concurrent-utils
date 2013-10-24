@@ -20,7 +20,7 @@ Accepting all internal defaults:
 // * Buffer sizes of 128 kB
 // * Default `Deflater` compression level
 // * Re-usable fixed thread pool of size = # processors.
-final ConcurrentGZIPOutputStream out = new ConcurrentGZIPOutputStream(new ByteArrayOutputStream());
+final OutputStream out = new ConcurrentGZIPOutputStream(new ByteArrayOutputStream());
 // write bytes to the stream however you like
 out.write(someBytesToCompress);
 out.close();
