@@ -1,7 +1,7 @@
-pigz4j
+concurrent-utils
 ====
 
-Threaded implementation of gzip stream based on [pigz][pigz].
+Threaded Java implementation of GZIP Output Stream utilizing dictionary primary technique described by [pigz][pigz].
 
 **High-level features:**
 

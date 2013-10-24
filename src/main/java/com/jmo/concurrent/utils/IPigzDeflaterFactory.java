@@ -1,4 +1,4 @@
-package com.pigz4j.io.stream;
+package com.jmo.concurrent.utils;
 
 public interface IPigzDeflaterFactory {
 

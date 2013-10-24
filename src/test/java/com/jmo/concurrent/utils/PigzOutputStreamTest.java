@@ -1,4 +1,4 @@
-package com.pigz4j.io.stream;
+package com.jmo.concurrent.utils;
 
 import org.junit.After;
 import org.junit.Before;
@@ -9,7 +9,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.util.Arrays;
-import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import static org.junit.Assert.assertTrue;

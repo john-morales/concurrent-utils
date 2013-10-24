@@ -1,4 +1,4 @@
-package com.pigz4j.io.stream;
+package com.jmo.concurrent.utils;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;

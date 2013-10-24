@@ -2,23 +2,23 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.pigz4j.io.stream</groupId>
-    <artifactId>pigz4j</artifactId>
+    <artifactId>concurrent-utils</artifactId>
     <version>0.3-SNAPSHOT</version>
     <packaging>jar</packaging>
 
-    <name>pigz4j</name>
-    <description>Threaded implementation of gzip stream based on pigz.</description>
-    <url>https://github.com/john-morales/pigz4j</url>
+    <name>concurrent-utils</name>
+    <description>Threaded implementation of GZIP output stream.</description>
+    <url>https://github.com/john-morales/concurrent-utils</url>
 
     <issueManagement>
         <system>github</system>
-        <url>http://github.com/john-morales/pigz4j/issues</url>
+        <url>http://github.com/john-morales/concurrent-utils/issues</url>
     </issueManagement>
 
     <scm>
-        <connection>scm:git:git@github.com:john-morales/pigz4j.git</connection>
-        <url>scm:git:git@github.com:john-morales/pigz4j.git</url>
-        <developerConnection>scm:git:git@github.com:john-morales/pigz4j.git</developerConnection>
+        <connection>scm:git:git@github.com:john-morales/concurrent-utils.git</connection>
+        <url>scm:git:git@github.com:john-morales/concurrent-utils.git</url>
+        <developerConnection>scm:git:git@github.com:john-morales/concurrent-utils.git</developerConnection>
       <tag>HEAD</tag>
   </scm>
 
