@@ -1,6 +1,5 @@
 package com.jmo.concurrent.utils;
 
-import com.jmo.concurrent.utils.*;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -17,34 +16,34 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-public class PigzDeflaterOutputStreamTest {
+public class ConcurrentDeflaterOutputStreamTest {
 
     @BeforeClass
     public static void setUp() throws Exception {
-        Logger.getLogger("com.pigz4j").setLevel(Level.OFF);
+        Logger.getLogger("com.jmo.concurrent.utils").setLevel(Level.OFF);
     }
 
     @Test public void assertInvariants() throws Exception {
         try {
-            new PigzDeflaterOutputStream(null, PigzDeflaterFactory.DEFAULT, Executors.newSingleThreadExecutor());
+            new ConcurrentDeflaterOutputStream(null, ConcurrentDeflaterFactory.DEFAULT, Executors.newSingleThreadExecutor());
             fail("expecting NPE from null output stream");
         } catch (NullPointerException expected) {
         }
 
         try {
-            new PigzDeflaterOutputStream(new ByteArrayOutputStream(), null, Executors.newSingleThreadExecutor());
+            new ConcurrentDeflaterOutputStream(new ByteArrayOutputStream(), null, Executors.newSingleThreadExecutor());
             fail("expecting NPE from null deflater factory");
         } catch (NullPointerException expected) {
         }
 
         try {
-            new PigzDeflaterOutputStream(new ByteArrayOutputStream(), PigzDeflaterFactory.DEFAULT, null);
+            new ConcurrentDeflaterOutputStream(new ByteArrayOutputStream(), ConcurrentDeflaterFactory.DEFAULT, null);
             fail("expecting NPE from null executor service");
         } catch (NullPointerException expected) {
         }
 
         try {
-            new PigzDeflaterOutputStream(new ByteArrayOutputStream(), 0, PigzDeflaterFactory.DEFAULT, Executors.newSingleThreadExecutor());
+            new ConcurrentDeflaterOutputStream(new ByteArrayOutputStream(), 0, ConcurrentDeflaterFactory.DEFAULT, Executors.newSingleThreadExecutor());
             fail("expecting IAE from block size less than 1");
         } catch (IllegalArgumentException expected) {
         }
@@ -53,10 +52,10 @@ public class PigzDeflaterOutputStreamTest {
     @Test public void exceptionsThrown_header() throws Exception {
         try {
             // allow single write of the gzip header
-            final PigzDeflaterOutputStream out = new PigzDeflaterOutputStream(new FlakyOutputStream(0),
-                    PigzDeflaterFactory.DEFAULT,
+            final ConcurrentDeflaterOutputStream out = new ConcurrentDeflaterOutputStream(new FlakyOutputStream(0),
+                    ConcurrentDeflaterFactory.DEFAULT,
                     Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors(),
-                            PigzOutputStream.DAEMON_FACTORY));
+                            ConcurrentGZIPOutputStream.DAEMON_FACTORY));
 
             fail("expecting IOException on write");
         } catch (IOException expected) {
@@ -68,10 +67,10 @@ public class PigzDeflaterOutputStreamTest {
         try {
             // allow single write of the gzip header
             final FlakyOutputStream flake = new FlakyOutputStream(1);
-            final PigzDeflaterOutputStream out = new PigzDeflaterOutputStream(flake,
-                    PigzDeflaterFactory.DEFAULT,
+            final ConcurrentDeflaterOutputStream out = new ConcurrentDeflaterOutputStream(flake,
+                    ConcurrentDeflaterFactory.DEFAULT,
                     Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors(),
-                            PigzOutputStream.DAEMON_FACTORY));
+                            ConcurrentGZIPOutputStream.DAEMON_FACTORY));
 
             out.write(1);
             flake.throwLatch.await(10, TimeUnit.SECONDS);
@@ -87,10 +86,10 @@ public class PigzDeflaterOutputStreamTest {
         try {
             // allow single write of the gzip header
             final FlakyOutputStream flake = new FlakyOutputStream(1);
-            final PigzDeflaterOutputStream out = new PigzDeflaterOutputStream(flake,
-                    PigzDeflaterFactory.DEFAULT,
+            final ConcurrentDeflaterOutputStream out = new ConcurrentDeflaterOutputStream(flake,
+                    ConcurrentDeflaterFactory.DEFAULT,
                     Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors(),
-                            PigzOutputStream.DAEMON_FACTORY));
+                            ConcurrentGZIPOutputStream.DAEMON_FACTORY));
 
             out.write(1);
             flake.throwLatch.await(10, TimeUnit.SECONDS);
@@ -106,10 +105,10 @@ public class PigzDeflaterOutputStreamTest {
     @Test public void timeoutsRethrown() throws Exception {
         try {
             final SleepyDeflaterFactory sleepyFactory = new SleepyDeflaterFactory();
-            final PigzDeflaterOutputStream out = new PigzDeflaterOutputStream(new ByteArrayOutputStream(),
+            final ConcurrentDeflaterOutputStream out = new ConcurrentDeflaterOutputStream(new ByteArrayOutputStream(),
                     sleepyFactory,
                     Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors(),
-                            PigzOutputStream.DAEMON_FACTORY));
+                            ConcurrentGZIPOutputStream.DAEMON_FACTORY));
 
             out.write(1);
             sleepyFactory.sleepLatch.await();
@@ -148,7 +147,7 @@ public class PigzDeflaterOutputStreamTest {
         }
     }
 
-    private static class SleepyDeflaterFactory implements IPigzDeflaterFactory {
+    private static class SleepyDeflaterFactory implements IConcurrentDeflaterFactory {
 
         private final CountDownLatch sleepLatch;
 
@@ -156,8 +155,8 @@ public class PigzDeflaterOutputStreamTest {
             sleepLatch = new CountDownLatch(1);
         }
 
-        public PigzDeflater getDeflater() {
-            return new PigzDeflater() {
+        public ConcurrentDeflater getDeflater() {
+            return new ConcurrentDeflater() {
                 @Override
                 public int deflate(final byte[] b, final int off, final int len, final int flush) {
                     try {

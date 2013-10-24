@@ -19,10 +19,10 @@ import java.util.zip.Deflater;
  *
  * Usage requires calling finish() before close().
  */
-class PigzDeflaterOutputStream extends FilterOutputStream {
+class ConcurrentDeflaterOutputStream extends FilterOutputStream {
 
     static final int DEFAULT_BLOCK_SIZE = 1 << 17; // 128k
-    static final Logger LOG = Logger.getLogger( PigzDeflaterOutputStream.class.getName() );
+    static final Logger LOG = Logger.getLogger( ConcurrentDeflaterOutputStream.class.getName() );
 
     private final ExecutorService _executorService;
     private final AtomicLong _sequencer;
@@ -30,7 +30,7 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
     private final AtomicLong _totalOut;
 
     private final int _blockSize;
-    private final IPigzDeflaterFactory _deflaterFactory;
+    private final IConcurrentDeflaterFactory _deflaterFactory;
     private final GzipWriter _outWriter;
     private final AtomicReference<IOException> _writeError;
     private final CRC32 _crc;
@@ -40,15 +40,15 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
     private boolean _isClosed;
 
 
-    public PigzDeflaterOutputStream(final OutputStream pOut,
-                                    final IPigzDeflaterFactory pDeflaterFactory,
-                                    final ExecutorService pExecutorService) throws IOException {
+    public ConcurrentDeflaterOutputStream(final OutputStream pOut,
+                                          final IConcurrentDeflaterFactory pDeflaterFactory,
+                                          final ExecutorService pExecutorService) throws IOException {
         this(pOut, DEFAULT_BLOCK_SIZE, pDeflaterFactory, pExecutorService);
     }
 
-    public PigzDeflaterOutputStream(final OutputStream pOut, final int pBlockSize,
-                                    final IPigzDeflaterFactory pDeflaterFactory,
-                                    final ExecutorService pExecutorService) throws IOException {
+    public ConcurrentDeflaterOutputStream(final OutputStream pOut, final int pBlockSize,
+                                          final IConcurrentDeflaterFactory pDeflaterFactory,
+                                          final ExecutorService pExecutorService) throws IOException {
         super(pOut);
         if ( pOut == null ) {
             throw new NullPointerException("null underlying output stream");
@@ -166,7 +166,7 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
 
         // Writing closing bytes to stream - does not have to be same deflater
         final byte[] buf = new byte[_blockSize];
-        final PigzDeflater def = getDeflater();
+        final ConcurrentDeflater def = getDeflater();
         def.finish();
         while ( !def.finished() ) {
             int deflated = def.deflate(buf);
@@ -238,7 +238,7 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
     /**
      * @return deflater instance from factory
      */
-    protected PigzDeflater getDeflater() {
+    protected ConcurrentDeflater getDeflater() {
         return _deflaterFactory.getDeflater();
     }
 
@@ -277,7 +277,7 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
     }
 
     protected boolean isDefaultExecutor() {
-        return _executorService == PigzOutputStream.getDefaultExecutorService();
+        return _executorService == ConcurrentGZIPOutputStream.getDefaultExecutorService();
     }
 
     protected boolean setWriteError(final IOException expect, final IOException update) {
@@ -301,7 +301,7 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
 
     private static class GzipWorker implements Runnable {
 
-        private final PigzDeflaterOutputStream _stream;
+        private final ConcurrentDeflaterOutputStream _stream;
         private final long _sequence;
         private final GzipWorker _previous;
         private final CountDownLatch _doneLatch;
@@ -310,7 +310,7 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
         private final int _offset;
         private final int _len;
 
-        public GzipWorker(final PigzDeflaterOutputStream pStream, final long pSequence, final GzipWorker pPrevious,
+        public GzipWorker(final ConcurrentDeflaterOutputStream pStream, final long pSequence, final GzipWorker pPrevious,
                           final byte[] pBuf, final int pOff, final int pLen) {
             _stream = pStream;
             _sequence = pSequence;
@@ -424,7 +424,7 @@ class PigzDeflaterOutputStream extends FilterOutputStream {
 
     private static class GzipWriter extends Thread {
         private static final AtomicInteger SERIAL = new AtomicInteger(0);
-        private static final String PREFIX = "pigz4j-OutWorker-";
+        private static final String PREFIX = "concurrent-utils-OutWorker-";
 
         private final BlockingQueue<GzipBlock> _blockQueue;
         private final CountDownLatch _doneLatch;

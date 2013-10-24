@@ -1,7 +1,7 @@
 concurrent-utils
 ====
 
-Threaded Java implementation of GZIP Output Stream utilizing dictionary primary technique described by [pigz][pigz].
+Threaded Java implementation of GZIP output stream for high-performance compression.
 
 **High-level features:**
 
@@ -9,7 +9,7 @@ Threaded Java implementation of GZIP Output Stream utilizing dictionary primary 
 * Configurable buffer sizes, compression level, and thread pooling.
 * Fails fast on any I/O issues on underlying stream or compression.
 * Speeds up compression of larger content close to linearly with # threads.
-* Like pigz, the last 1/4 of previous block is used to prime dictionary for better compression.
+* Implements [pigz][pigz] technique of priming compression dictionary with last 1/4 of previous block for better compression.
 
 Quick Start Usage
 -----------------
@@ -20,7 +20,7 @@ Accepting all internal defaults:
 // * Buffer sizes of 128 kB
 // * Default `Deflater` compression level
 // * Re-usable fixed thread pool of size = # processors.
-final PigzOutputStream out = new PigzOutputStream(new ByteArrayOutputStream());
+final ConcurrentGZIPOutputStream out = new ConcurrentGZIPOutputStream(new ByteArrayOutputStream());
 // write bytes to the stream however you like
 out.write(someBytesToCompress);
 out.close();
@@ -30,7 +30,7 @@ Benchmarks
 ----------
 
 Benchmarks performed on a 24-core KnownHost VPS-2 instance with JDK 7u21.
-See [PigzPerformanceTest][pigzperformancetest] for the test case, which can be run with:
+See [ConcurrentGZIPPerformanceTest][concurrentgzipperformancetest] for the test case, which can be run with:
 
 ```
 $ mvn clean test -DincludePerfTests=true
@@ -47,7 +47,7 @@ better compression. The last 1/4 of previous block method helps offset some of
 the disadvantage, but still isn't as good as using a single dictionary for the
 entire input.)
 
-See [PigzOutputStreamTest][pigzoutputstreamtest] unit test for more examples.
+See [ConcurrentGZIPOutputStreamTest][concurrentgzipoutputstreamtest] unit test for more examples.
 
 Limitations
 -----------
@@ -56,7 +56,7 @@ Limitations
 
 [pigz]: http://zlib.net/pigz/
 [outputstream]: http://docs.oracle.com/javase/7/docs/api/java/io/OutputStream.html
-[pigzoutputstreamtest]: https://github.com/john-morales/pigz4j/blob/master/src/test/java/com/pigz4j/io/stream/PigzOutputStreamTest.java
-[pigzperformancetest]: https://github.com/john-morales/pigz4j/blob/master/src/test/java/com/pigz4j/io/stream/PigzOutputStreamTest.java
-[random_chart_small]: https://raw.github.com/john-morales/pigz4j/master/doc/img/20130523_random_1280.png "Random Data Pattern - Compressing 64MB"
-[sequential_chart_small]: https://raw.github.com/john-morales/pigz4j/master/doc/img/20130523_sequential_1280.png "Sequential Data Pattern - Compressing 64MB"
+[concurrentgzipoutputstreamtest]: https://github.com/john-morales/concurrent-utils/blob/master/src/test/java/com/jmo/concurrent/utils/ConcurrentGZIPOutputStreamTest.java
+[concurrentgzipperformancetest]: https://github.com/john-morales/concurrent-utils/blob/master/src/test/java/com/jmo/concurrent/utils/ConcurrentGZIPPerformanceTest.java
+[random_chart_small]: https://raw.github.com/john-morales/concurrent-utils/master/doc/img/20130523_random_1280.png "Random Data Pattern - Compressing 64MB"
+[sequential_chart_small]: https://raw.github.com/john-morales/concurrent-utils/master/doc/img/20130523_sequential_1280.png "Sequential Data Pattern - Compressing 64MB"

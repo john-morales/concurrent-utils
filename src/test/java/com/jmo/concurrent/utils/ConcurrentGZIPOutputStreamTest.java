@@ -13,7 +13,7 @@ import java.util.zip.GZIPOutputStream;
 
 import static org.junit.Assert.assertTrue;
 
-public class PigzOutputStreamTest extends PigzTest {
+public class ConcurrentGZIPOutputStreamTest extends ConcurrentUtilsTest {
 
     private static final int INPUT_SIZE = 2 * ONE_MB;
     private static final String TEST_SANDBOX = "test_sandbox";
@@ -44,9 +44,9 @@ public class PigzOutputStreamTest extends PigzTest {
 
         final FileOutputStream compressed = new FileOutputStream(TEST_FILE1);
 
-        final PigzOutputStream out = new PigzOutputStream(compressed,
-                PigzOutputStream.DEFAULT_BUFSZ,
-                PigzDeflaterOutputStream.DEFAULT_BLOCK_SIZE);
+        final ConcurrentGZIPOutputStream out = new ConcurrentGZIPOutputStream(compressed,
+                ConcurrentGZIPOutputStream.DEFAULT_BUFSZ,
+                ConcurrentDeflaterOutputStream.DEFAULT_BLOCK_SIZE);
 
         out.write(sourceBytes);
         out.close();
@@ -61,9 +61,9 @@ public class PigzOutputStreamTest extends PigzTest {
 
         final ByteArrayOutputStream compressed = new ByteArrayOutputStream();
 
-        final PigzOutputStream out = new PigzOutputStream(compressed,
-                PigzOutputStream.DEFAULT_BUFSZ,
-                PigzDeflaterOutputStream.DEFAULT_BLOCK_SIZE);
+        final ConcurrentGZIPOutputStream out = new ConcurrentGZIPOutputStream(compressed,
+                ConcurrentGZIPOutputStream.DEFAULT_BUFSZ,
+                ConcurrentDeflaterOutputStream.DEFAULT_BLOCK_SIZE);
 
         out.write(sourceBytes);
         out.close();
@@ -77,9 +77,9 @@ public class PigzOutputStreamTest extends PigzTest {
 
         final ByteArrayOutputStream compressed = new ByteArrayOutputStream();
 
-        final PigzOutputStream out = new PigzOutputStream(compressed,
-                PigzOutputStream.DEFAULT_BUFSZ,
-                PigzDeflaterOutputStream.DEFAULT_BLOCK_SIZE);
+        final ConcurrentGZIPOutputStream out = new ConcurrentGZIPOutputStream(compressed,
+                ConcurrentGZIPOutputStream.DEFAULT_BUFSZ,
+                ConcurrentDeflaterOutputStream.DEFAULT_BLOCK_SIZE);
 
         out.write(sourceBytes);
         out.close();
@@ -93,7 +93,7 @@ public class PigzOutputStreamTest extends PigzTest {
 
         final ByteArrayOutputStream compressed = new ByteArrayOutputStream();
 
-        final PigzOutputStream out = new PigzOutputStream(compressed);
+        final ConcurrentGZIPOutputStream out = new ConcurrentGZIPOutputStream(compressed);
         out.write(sourceBytes);
         out.close();
 
@@ -106,7 +106,7 @@ public class PigzOutputStreamTest extends PigzTest {
 
         final ByteArrayOutputStream compressed = new ByteArrayOutputStream();
 
-        final GZIPOutputStream out = new GZIPOutputStream(compressed,PigzOutputStream.DEFAULT_BUFSZ);
+        final GZIPOutputStream out = new GZIPOutputStream(compressed, ConcurrentGZIPOutputStream.DEFAULT_BUFSZ);
 
         out.write(sourceBytes);
         out.finish();
@@ -122,7 +122,7 @@ public class PigzOutputStreamTest extends PigzTest {
 
         final ByteArrayOutputStream compressed = new ByteArrayOutputStream();
 
-        final GZIPOutputStream out = new GZIPOutputStream(compressed,PigzOutputStream.DEFAULT_BUFSZ);
+        final GZIPOutputStream out = new GZIPOutputStream(compressed, ConcurrentGZIPOutputStream.DEFAULT_BUFSZ);
 
         out.write(sourceBytes);
         out.finish();

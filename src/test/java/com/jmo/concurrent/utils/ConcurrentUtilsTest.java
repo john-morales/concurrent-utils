@@ -4,7 +4,7 @@ import java.io.*;
 import java.security.SecureRandom;
 import java.util.zip.GZIPInputStream;
 
-public abstract class PigzTest {
+public abstract class ConcurrentUtilsTest {
 
     protected static final int ONE_MB = 1 << 20;
 

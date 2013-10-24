@@ -17,7 +17,7 @@ import java.util.logging.Logger;
  *
  * The buffer size used should be relatively high for reasonable compression.
  */
-public class PigzOutputStream extends BufferedOutputStream {
+public class ConcurrentGZIPOutputStream extends BufferedOutputStream {
 
     /**
      * Default size of buffered output stream.
@@ -29,31 +29,31 @@ public class PigzOutputStream extends BufferedOutputStream {
      */
     public static final int DEFAULT_BLOCKSZ = 1 << 17; // 128kB
 
-    static final Logger LOG = Logger.getLogger( PigzOutputStream.class.getName() );
+    static final Logger LOG = Logger.getLogger( ConcurrentGZIPOutputStream.class.getName() );
 
-    private final PigzDeflaterOutputStream _deflaterDelegate;
+    private final ConcurrentDeflaterOutputStream _deflaterDelegate;
 
     private boolean _closed = false;
 
-    public PigzOutputStream(final OutputStream pOut) throws IOException {
+    public ConcurrentGZIPOutputStream(final OutputStream pOut) throws IOException {
         this(pOut, DEFAULT_BUFSZ);
     }
 
-    public PigzOutputStream(final OutputStream pOut, final int pBufferSize) throws IOException {
+    public ConcurrentGZIPOutputStream(final OutputStream pOut, final int pBufferSize) throws IOException {
         this(pOut, pBufferSize, DEFAULT_BLOCKSZ);
     }
 
-    public PigzOutputStream(final OutputStream pOut, final int pBufferSize, final int pBlockSize) throws IOException {
-        this(pOut, pBufferSize, pBlockSize, PigzDeflaterFactory.DEFAULT, getDefaultExecutorService());
+    public ConcurrentGZIPOutputStream(final OutputStream pOut, final int pBufferSize, final int pBlockSize) throws IOException {
+        this(pOut, pBufferSize, pBlockSize, ConcurrentDeflaterFactory.DEFAULT, getDefaultExecutorService());
     }
 
-    public PigzOutputStream(final OutputStream pOut, final int pBufferSize, final int pBlockSize,
-                            final IPigzDeflaterFactory pDeflaterFactory,
-                            final ExecutorService pExecutorService) throws IOException {
-        this(new PigzDeflaterOutputStream(pOut, pBlockSize, pDeflaterFactory, pExecutorService), pBufferSize);
+    public ConcurrentGZIPOutputStream(final OutputStream pOut, final int pBufferSize, final int pBlockSize,
+                                      final IConcurrentDeflaterFactory pDeflaterFactory,
+                                      final ExecutorService pExecutorService) throws IOException {
+        this(new ConcurrentDeflaterOutputStream(pOut, pBlockSize, pDeflaterFactory, pExecutorService), pBufferSize);
     }
 
-    private PigzOutputStream(final PigzDeflaterOutputStream pOut, final int pBufferSize) throws IOException {
+    private ConcurrentGZIPOutputStream(final ConcurrentDeflaterOutputStream pOut, final int pBufferSize) throws IOException {
         super(pOut, pBufferSize);
         _deflaterDelegate = pOut;
     }
@@ -117,7 +117,7 @@ public class PigzOutputStream extends BufferedOutputStream {
 
     private static final class DaemonThreadFactory implements ThreadFactory {
         static final AtomicInteger SERIAL = new AtomicInteger(0);
-        static final String NAME_PREFIX = "pigz4j-GzipWorker-";
+        static final String NAME_PREFIX = "concurrent-utils-GzipWorker-";
         final ThreadGroup _group;
 
         public DaemonThreadFactory() {

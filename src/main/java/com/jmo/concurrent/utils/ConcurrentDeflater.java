@@ -6,14 +6,14 @@ import java.util.zip.Deflater;
  * Guarantees Deflater implementation uses nowrap such that it's GZIP compatible.
  */
 
-public class PigzDeflater extends Deflater {
+public class ConcurrentDeflater extends Deflater {
 
     private int _level;
 
     /**
      * @see Deflater#DEFAULT_COMPRESSION
      */
-    protected PigzDeflater() {
+    protected ConcurrentDeflater() {
         this(DEFAULT_COMPRESSION);
     }
 
@@ -22,11 +22,11 @@ public class PigzDeflater extends Deflater {
      * @param level 1 thru 9 or -1 for default
      * @see Deflater#setLevel(int)
      */
-    protected PigzDeflater(final int level) {
+    protected ConcurrentDeflater(final int level) {
         this(level, true);
     }
 
-    PigzDeflater(final int level, final boolean nowrap) {
+    ConcurrentDeflater(final int level, final boolean nowrap) {
         super(level, nowrap);
         if ( !nowrap ) { throw new IllegalStateException("nowrap required for GZIP compatibility"); }
         _level = level;
